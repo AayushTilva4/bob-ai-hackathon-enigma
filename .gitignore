@@ -50,10 +50,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# ML artifacts (Phase 4)
-src/backend/prediction/artifacts/*.pkl
-src/backend/prediction/artifacts/*.joblib
-src/backend/prediction/artifacts/*.json
+# ML artifacts (Phase 4) — exclude large binaries, keep metrics
+models/*.joblib
+models/*.json
+# Uncomment below to track training_metrics.json in git:
+# !models/training_metrics.json
 
 # OS
 .DS_Store

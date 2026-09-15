@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api import berths, cranes, health, port, routes, simulation, vessels, yard
+from api import berths, cranes, health, port, prediction, routes, simulation, vessels, yard
 from config import get_settings
 from database.connection import engine
 from seed.seed_data import seed_if_empty
@@ -96,3 +96,4 @@ app.include_router(yard.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(port.router, prefix="/api")
 app.include_router(simulation.router)
+app.include_router(prediction.router)
