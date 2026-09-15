@@ -8,6 +8,9 @@ asyncpg==0.29.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.1
 
+# Phase 5 — Optimization Engine
+ortools>=9.8
+
 # Phase 4 — ML Congestion Prediction Engine
 xgboost>=2.0.0
 scikit-learn>=1.2.0

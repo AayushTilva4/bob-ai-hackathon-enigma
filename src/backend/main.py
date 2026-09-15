@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api import berths, cranes, health, port, prediction, routes, simulation, vessels, yard
+from api import berths, copilot, cranes, health, optimization, port, prediction, routes, simulation, vessels, yard
 from config import get_settings
 from database.connection import engine
 from seed.seed_data import seed_if_empty
@@ -97,3 +97,20 @@ app.include_router(routes.router, prefix="/api")
 app.include_router(port.router, prefix="/api")
 app.include_router(simulation.router)
 app.include_router(prediction.router)
+app.include_router(optimization.router)
+app.include_router(copilot.router)
+
+
+# ---------------------------------------------------------------------------
+# CORS — allow frontend to call backend
+# ---------------------------------------------------------------------------
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

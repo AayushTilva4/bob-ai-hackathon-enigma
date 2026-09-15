@@ -1,0 +1,72 @@
+team
+  name Enigma
+  track AI
+
+  lead
+    name Aayush Tilva
+    email 23ce137@charusat.edu.in
+
+  members
+    - name Sohil Kareliya
+      email 23dcs044@charusat.edu.in 
+    - name Prashant Gangani
+      email 23it033@charusat.edu.in
+    - name Yakshit Koshiya
+      email 23it047@charusat.edu.in
+
+submission
+  title HarborAI — Intelligent Port Operations Optimizer
+
+  problem_statement 
+    Port operators must manually coordinate vessel arrivals, berth assignments,
+    crane availability, yard capacity, and vessel routing. This reactive
+    planning
+    makes it difficult to identify congestion before it becomes operationally
+    critical and can lead to vessel waiting time, resource underutilization,
+    and avoidable operational delays.
+
+  solution_summary 
+    HarborAI is an intelligent port operations platform that combines
+    deterministic port simulation, congestion prediction, operational
+    optimization, and an AI-powered operator interface. The system models
+    vessels, berths, cranes, yard zones, and routes over a 72-hour operational
+    horizon, predicts emerging congestion, evaluates alternative operational
+    decisions, and helps operators understand and compare optimized plans.
+
+  key_features
+    - Deterministic port simulation with vessel, berth, crane, yard, and route states
+    - Synthetic operational data generation for congestion analysis and model training
+    - XGBoost-based congestion prediction using operational and capacity features
+    - Optimization of berth, crane, yard, and routing decisions using operational constraints
+    - AI-assisted operator interaction for explaining forecasts and operational decisions
+
+  technologies
+    - Python
+    - FastAPI
+    - PostgreSQL
+    - SQLAlchemy
+    - Alembic
+    - XGBoost
+    - scikit-learn
+    - pandas
+    - NumPy
+    - Google OR-Tools
+    - Next.js
+    - TypeScript
+    - Tailwind CSS
+    - Docker
+    - Docker Compose
+    - IBM Bob
+    - IBM watsonx
+
+  repository
+    url httpsgithub.comAayushTilva4bob-ai-hackathon-enigma
+    branch main
+
+  demo
+    live_demo NOT DEPLOYED
+    video TO_BE_ADDED
+
+  status
+    implementation In progress
+    data Synthetic  simulated
