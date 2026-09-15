@@ -1,14 +1,13 @@
 """
 pytest fixtures shared across all tests.
 
-Uses an in-memory SQLite database so tests run without a live PostgreSQL instance.
-Seed builders are called directly to avoid monkey-patching the seed module.
-
-SQLite + SQLAlchemy 2.0 note: we insert records one at a time to avoid the
-insertmanyvalues RETURNING path which conflicts with explicit UUID PKs on SQLite.
+Uses the dedicated PostgreSQL integration-test database.  The production schema
+uses PostgreSQL UUID columns, so exercising the API against PostgreSQL prevents
+SQLite type-affinity differences from masking or creating database bugs.
 """
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -19,7 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from database.connection import get_db
 from database.models import Base
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://harborai:harborai@localhost:5432/harborai_test",
+)
 
 
 @pytest.fixture(scope="session")
@@ -34,11 +36,13 @@ async def test_engine():
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        connect_args={"check_same_thread": False},
     )
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
@@ -53,18 +57,12 @@ async def test_session_factory(test_engine):
     )
 
 
-async def _add_one_by_one(session: AsyncSession, items: list) -> None:
-    """Insert items individually to avoid SQLite insertmanyvalues RETURNING issues."""
-    for item in items:
-        session.add(item)
-        await session.flush()
-
-
 @pytest_asyncio.fixture(scope="session")
 async def seeded_app(test_session_factory):
     """
-    Return the FastAPI app wired to the test DB, with seed data inserted.
-    Seed builders are called directly; records inserted individually.
+    Return the FastAPI app wired to the test DB, with seed data inserted once.
+    Seed builders are called directly so application startup never touches the
+    production-session dependency during a test run.
     """
     import main as app_module
     from seed.seed_data import (
@@ -85,21 +83,24 @@ async def seeded_app(test_session_factory):
 
     async with test_session_factory() as session:
         berths = _build_berths()
-        await _add_one_by_one(session, berths)
+        session.add_all(berths)
+        await session.flush()
 
         cranes = _build_cranes(berths)
         yard_zones = _build_yard_zones()
         routes = _build_routes()
-        await _add_one_by_one(session, cranes)
-        await _add_one_by_one(session, yard_zones)
-        await _add_one_by_one(session, routes)
+        session.add_all(cranes)
+        session.add_all(yard_zones)
+        session.add_all(routes)
+        await session.flush()
 
         vessels = _build_vessels(berths)
-        await _add_one_by_one(session, vessels)
+        session.add_all(vessels)
+        await session.flush()
 
         schedules = _build_schedules(vessels, berths, yard_zones, routes)
         port_state = _build_port_state(vessels, berths)
-        await _add_one_by_one(session, schedules)
+        session.add_all(schedules)
         session.add(port_state)
         await session.commit()
 

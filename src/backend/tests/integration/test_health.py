@@ -17,4 +17,5 @@ async def test_health_response_shape(client):
     assert "db" in body
     assert "version" in body
     assert body["status"] == "ok"
+    assert body["db"] == "connected"
     assert body["version"] == "0.1.0"
