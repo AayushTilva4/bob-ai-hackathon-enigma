@@ -1,19 +1,29 @@
 import os
 import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# Add src/backend to path so models can be imported
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "backend"))
+# Add src/backend to path so models can be imported.
+_here = Path(__file__).resolve().parent
+for candidate in (_here.parent / "src" / "backend", _here.parent / "backend"):
+    if candidate.exists():
+        sys.path.insert(0, str(candidate))
+        break
 
 from database.models import Base  # noqa: E402
 
 config = context.config
 
-# Read DATABASE_URL_SYNC from environment if not set in alembic.ini
-db_url = os.environ.get("DATABASE_URL_SYNC")
+# Allow callers (including isolated test runs / Docker) to override the URL.
+# TEST_DATABASE_URL_SYNC takes precedence over DATABASE_URL_SYNC.
+db_url = (
+    os.environ.get("TEST_DATABASE_URL_SYNC")
+    or os.environ.get("ALEMBIC_DATABASE_URL")
+    or os.environ.get("DATABASE_URL_SYNC")
+)
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
 

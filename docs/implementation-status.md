@@ -11,7 +11,7 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 0 | ✅ Complete | Repository inspection + implementation planning |
-| 1 | 📋 Planned | Domain model + database foundation |
+| 1 | 🛠️ Stabilization in progress | Domain model + database foundation |
 | 2 | ⏳ Pending | Port simulation engine |
 | 3 | ⏳ Pending | Synthetic data generation |
 | 4 | ⏳ Pending | ML congestion prediction |
@@ -115,7 +115,7 @@ src/
     │   └── seed_data.py     # deterministic seed, random.seed(42)
     │
     └── tests/
-        ├── conftest.py      # test DB (SQLite in-memory), TestClient, seed fixture
+        ├── conftest.py      # dedicated PostgreSQL test DB, Alembic migration, real seed fixture
         ├── unit/
         │   ├── test_vessel_schema.py    # Pydantic validation, status/priority enums
         │   ├── test_berth_schema.py     # length/draft field constraints
@@ -331,7 +331,7 @@ python-dotenv==1.0.1
 pytest==8.2.0
 pytest-asyncio==0.23.7
 httpx==0.27.0            # async TestClient
-aiosqlite==0.20.0        # SQLite in-memory test DB (avoids needing Postgres for unit tests)
+aiosqlite==0.20.0        # Optional SQLite dependency for isolated unit tests
 ```
 
 Not installed until their phases: `scikit-learn`, `xgboost`, `ortools`, `pandas`, `numpy`,
@@ -376,6 +376,8 @@ RANDOM_SEED=42
 ---
 
 ### 7. Verification Steps
+
+**Current stabilization target:** Docker Compose starts PostgreSQL, `migrate` applies Alembic, `backend` starts only after a successful migration, and integration tests run against the same PostgreSQL schema path.
 
 ```bash
 # Start Postgres
@@ -456,7 +458,9 @@ pytest tests/unit/test_vessel_schema.py -k "test_invalid_status_rejected" -v
 
 ## Known Issues / Blockers
 
-None.
+- Docker/PostgreSQL environment must be available to complete end-to-end Phase 1 verification.
+- Integration tests use the dedicated PostgreSQL database and exercise the Alembic migration path.
+- Phase 1 remains **not complete** until migration, seed, API smoke tests, and the full PostgreSQL test suite pass on the target development environment.
 
 ---
 

@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 from api import health, vessels, berths, cranes, yard, routes, port
 from config import get_settings
 from database.connection import engine
-from database.models import Base
 from seed.seed_data import seed_if_empty
 
 settings = get_settings()

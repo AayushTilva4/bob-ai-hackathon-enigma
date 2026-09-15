@@ -490,12 +490,24 @@ def _build_port_state(vessels: list[Vessel], berths: list[Berth]) -> PortState:
     waiting_count = sum(1 for v in vessels if v.status in waiting_statuses)
     upcoming_count = sum(1 for v in vessels if v.status in {VesselStatus.approaching, VesselStatus.at_sea})
 
+    # Compute operational utilization from the actual seeded resources instead of
+    # storing hand-entered demo values.
+    crane_util = round(
+        sum(1 for crane in _build_cranes(berths) if crane.status == CraneStatus.operating) / 6,
+        4,
+    )
+    # Weighted yard utilization by capacity.
+    yard_zones = _build_yard_zones()
+    total_capacity = sum(zone.total_capacity for zone in yard_zones)
+    occupied_capacity = sum(zone.occupied_capacity for zone in yard_zones)
+    yard_util = round(occupied_capacity / total_capacity, 4) if total_capacity else 0.0
+
     return PortState(
         id=uuid.UUID("70000000-0000-0000-0000-000000000001"),
         simulation_time=_BASE_TIME,
         berth_utilization=berth_util,
-        crane_utilization=0.67,   # 4 of 6 cranes operating/maintenance → 4/6
-        yard_utilization=0.62,    # weighted average across zones
+        crane_utilization=crane_util,
+        yard_utilization=yard_util,
         waiting_vessel_count=waiting_count,
         active_vessel_count=active_count,
         upcoming_arrivals_24h=upcoming_count,
@@ -513,12 +525,27 @@ def _build_port_state(vessels: list[Vessel], berths: list[Berth]) -> PortState:
 
 
 async def seed_if_empty() -> None:
-    """Seed the database only if the vessels table is empty."""
+    """Seed a completely empty database once; reject partial seed state."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Vessel).limit(1))
         if result.scalar_one_or_none() is not None:
-            logger.info("Database already seeded — skipping")
+            logger.info("Database already contains vessels — skipping seed")
             return
+
+        # If vessels are missing but other core tables contain rows, the database
+        # is only partially initialized. Failing loudly is safer than inserting
+        # fixed UUIDs into a partially populated database.
+        core_models = (Berth, Crane, YardZone, Route, Schedule, PortState)
+        partial_tables = []
+        for model in core_models:
+            existing = await session.execute(select(model.id).limit(1))
+            if existing.scalar_one_or_none() is not None:
+                partial_tables.append(model.__tablename__)
+        if partial_tables:
+            raise RuntimeError(
+                "Database contains partial HarborAI seed state; "
+                f"non-empty tables: {', '.join(partial_tables)}"
+            )
 
         logger.info("Seeding database with deterministic Phase 1 data...")
 
