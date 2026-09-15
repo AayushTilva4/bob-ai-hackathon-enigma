@@ -126,7 +126,7 @@ class Berth(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     status: Mapped[BerthStatus] = mapped_column(
-        Enum(BerthStatus, name="berthstatus"), nullable=False, default=BerthStatus.available
+        Enum(BerthStatus, name="berthstatus"), nullable=False, default=BerthStatus.available, index=True
     )
 
     # back-references (populated by FK owners)
@@ -151,10 +151,12 @@ class Vessel(TimestampMixin, Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(VARCHAR(120), nullable=False)
+    imo_number: Mapped[str | None] = mapped_column(VARCHAR(20), nullable=True, unique=True, index=True)
     vessel_type: Mapped[VesselType] = mapped_column(
         Enum(VesselType, name="vesseltype"), nullable=False
     )
     length_m: Mapped[float] = mapped_column(FLOAT, nullable=False)
+    beam_m: Mapped[float | None] = mapped_column(FLOAT, nullable=True)
     draft_m: Mapped[float] = mapped_column(FLOAT, nullable=False)
     container_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     containers_to_handle: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -176,11 +178,12 @@ class Vessel(TimestampMixin, Base):
         Enum(VesselStatus, name="vesselstatus"),
         nullable=False,
         default=VesselStatus.at_sea,
+        index=True,
     )
     destination: Mapped[str | None] = mapped_column(VARCHAR(120), nullable=True)
     # One-way FK: Vessel → Berth (no reverse FK on Berth)
     assigned_berth_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=True, index=True
     )
     expected_handling_duration_h: Mapped[float | None] = mapped_column(
         FLOAT, nullable=True
@@ -208,14 +211,14 @@ class Crane(TimestampMixin, Base):
     )
     name: Mapped[str] = mapped_column(VARCHAR(60), nullable=False, unique=True)
     status: Mapped[CraneStatus] = mapped_column(
-        Enum(CraneStatus, name="cranestatus"), nullable=False, default=CraneStatus.available
+        Enum(CraneStatus, name="cranestatus"), nullable=False, default=CraneStatus.available, index=True
     )
     available_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     handling_rate_containers_per_h: Mapped[float] = mapped_column(FLOAT, nullable=False)
     current_berth_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=True, index=True
     )
 
     current_berth: Mapped["Berth | None"] = relationship(
@@ -236,6 +239,13 @@ class YardZone(TimestampMixin, Base):
     schedules: Mapped[list["Schedule"]] = relationship(
         "Schedule", back_populates="yard_zone"
     )
+
+    @property
+    def utilization(self) -> float:
+        """Computed utilization ratio, safe against zero total capacity."""
+        if not self.total_capacity or self.total_capacity <= 0:
+            return 0.0
+        return round(self.occupied_capacity / self.total_capacity, 4)
 
 
 class Route(TimestampMixin, Base):
@@ -263,13 +273,13 @@ class Schedule(TimestampMixin, Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     vessel_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("vessels.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("vessels.id"), nullable=False, index=True
     )
     berth_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("berths.id"), nullable=False, index=True
     )
     planned_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, index=True
     )
     planned_end: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -287,6 +297,7 @@ class Schedule(TimestampMixin, Base):
         Enum(ScheduleStatus, name="schedulestatus"),
         nullable=False,
         default=ScheduleStatus.draft,
+        index=True,
     )
 
     vessel: Mapped["Vessel"] = relationship("Vessel", back_populates="schedules")
@@ -306,11 +317,11 @@ class SimulationEvent(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     simulation_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, index=True
     )
-    event_type: Mapped[str] = mapped_column(VARCHAR(60), nullable=False)
+    event_type: Mapped[str] = mapped_column(VARCHAR(60), nullable=False, index=True)
     vessel_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("vessels.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("vessels.id"), nullable=True, index=True
     )
     berth_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("berths.id"), nullable=True
@@ -341,7 +352,7 @@ class PortState(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     simulation_time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, index=True
     )
     berth_utilization: Mapped[float] = mapped_column(FLOAT, nullable=False)
     crane_utilization: Mapped[float] = mapped_column(FLOAT, nullable=False)

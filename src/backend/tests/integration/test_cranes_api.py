@@ -13,7 +13,7 @@ async def test_list_cranes_returns_200(client):
 async def test_list_cranes_seeded_count(client):
     response = await client.get("/api/cranes")
     body = response.json()
-    assert body["total"] == 6
+    assert body["total"] == 8
 
 
 @pytest.mark.asyncio

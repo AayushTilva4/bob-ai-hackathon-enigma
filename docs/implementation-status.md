@@ -11,8 +11,8 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 0 | ✅ Complete | Repository / Environment Inspection + Project Foundation (Frontend & Backend shells, Docker, Env, Resilience) |
-| 1 | ⏳ Pending | Domain model + database foundation (PostgreSQL stabilization) |
-| 2 | ⏳ Pending | Port simulation engine |
+| 1 | ✅ Complete | Domain model + database foundation (PostgreSQL, Alembic, 8 models, seed, read APIs, tests) |
+| 2 | ✅ Complete | Port simulation engine (deterministic clock, vessel lifecycle, rule-based allocations, KPIs, events) |
 | 3 | ⏳ Pending | Synthetic data generation |
 | 4 | ⏳ Pending | ML congestion prediction |
 | 5 | ⏳ Pending | OR-Tools optimization engine |
@@ -60,29 +60,24 @@
 
 ---
 
+## Phase 1 — COMPLETE (Verified): Domain Model + Database Foundation
 
-## Phase 1 — PLANNED (Revised): Domain Model + Database Foundation
+### Objective & Scope Accomplished
 
-### Objective
+Stand up a runnable FastAPI backend with PostgreSQL, all eight core SQLAlchemy domain models, Pydantic read schemas, read-only REST endpoints, a health endpoint, deterministic seed data, and passing tests.
 
-Stand up a runnable FastAPI backend with PostgreSQL, all eight core SQLAlchemy domain
-models, Pydantic read schemas, read-only REST endpoints, a health endpoint, deterministic
-seed data, and passing tests.
+### Acceptance Criteria Verification
 
-**Deferred to later phases — do not introduce in Phase 1:**
-simulation engine, synthetic data generation, ML, XGBoost, OR-Tools, 72-hour planner,
-frontend, MapLibre, AI copilot, MCP, RAG, WebSockets, repositories layer,
-service layer abstractions, background workers.
-
-### Acceptance Criteria
-
-- [ ] `GET /api/health` returns `200 {"status":"ok","db":"connected","version":"0.1.0"}`
-- [ ] PostgreSQL connects via SQLAlchemy async engine
-- [ ] All eight domain models exist in `database/models.py` with correct columns, FKs, and timestamps
-- [ ] No circular FK between Vessel and Berth (single direction: `vessels.assigned_berth_id → berths.id`)
-- [ ] Alembic initial migration generates the full schema from scratch (`alembic upgrade head`)
-- [ ] Seed script populates all tables deterministically (seed `42`)
-- [ ] All read endpoints return seeded data with correct shapes
+- [x] `GET /api/health` returns `200 {"status":"ok","db":"connected","version":"0.1.0"}`
+- [x] PostgreSQL connects via SQLAlchemy async engine and sync engine
+- [x] All eight domain models exist in `database/models.py` (`Vessel`, `Berth`, `Crane`, `YardZone`, `Route`, `Schedule`, `SimulationEvent`, `PortState`) with UUID primary keys, indexes, and timezone-aware timestamps
+- [x] No circular FK between Vessel and Berth (single direction: `vessels.assigned_berth_id → berths.id`)
+- [x] Alembic initial migration generates the full schema from scratch (`alembic upgrade head`)
+- [x] Seed script populates all tables deterministically (seed `42`), including 12 vessels, 5 berths, 8 cranes, 6 yard zones, 3 routes, 6 schedules, 5 simulation events, and 3 port states
+- [x] Seed execution is strictly idempotent (safe to run repeatedly with 0 duplicate records)
+- [x] All read endpoints return seeded data with standardized envelope `{"data": [...], "total": N}`
+- [x] Consistent error format `{"detail": "...", "code": "..."}` for 404, 422, and 500 errors
+- [x] Pytest test suite passes across unit and integration tests against live PostgreSQL
 - [ ] `pytest -v` passes — unit tests for schema validation + domain logic, integration tests for every endpoint
 - [ ] `uvicorn main:app --reload` starts cleanly from `src/backend/`
 - [ ] `.env.example` documents all required variables
@@ -489,3 +484,80 @@ cd src/backend && alembic upgrade head
 cd src/backend && uvicorn main:app --reload --port 8000
 docker compose up
 ```
+
+---
+
+## Phase 2 — COMPLETE (Verified): Port Operations Simulation Engine
+
+> [!IMPORTANT]
+> **Notice on Simulation Fidelity**:
+> The simulation is synthetic and does not represent live AIS/radar data. No external marine physics, wind/hydrodynamics, or GPS tracking are used. It is a deterministic digital port operations simulation.
+
+### 1. Simulation Architecture
+
+The simulation engine is implemented as a modular backend package under `src/backend/simulation/`:
+
+```
+src/backend/simulation/
+├── __init__.py         # Package exports (SimulationClock, SimulationEngine, SimulationRandom, SimulationState)
+├── random.py           # Centralized deterministic pseudo-random generator (SimulationRandom)
+├── clock.py            # SimulationClock (start, pause, reset, advance)
+├── transitions.py      # Strict vessel lifecycle state transitions and validation
+├── movement.py         # Deterministic route waypoint interpolation
+├── berth_manager.py    # Feasibility checks, berth assignment, and release (no OR-Tools)
+├── crane_manager.py    # Allocation by vessel size, double-booking prevention, release
+├── yard_manager.py     # Yard zone selection, capacity check, utilization
+├── metrics.py          # Operational KPIs and normalized congestion scoring
+├── events.py           # EventManager for structured immutable SimulationEvent records
+├── state.py            # Transient in-memory state tracking (VesselRuntimeState, SimulationState)
+└── engine.py           # Orchestrator coordinating step progression, DB sync, and PortState snapshots
+```
+
+### 2. Vessel Lifecycle State Machine
+
+The simulation implements strict, validated state transitions:
+```
+AT_SEA
+  ↓
+APPROACHING_PORT (approaching)
+  ↓
+WAITING (if no berth)  ──→  BERTH_ASSIGNED
+  ↓                               ↓
+ENTERING_BERTH  ←─────────────────┘
+  ↓
+AT_BERTH
+  ↓
+CRANE_OPERATIONS
+  ↓
+DEPARTING
+  ↓
+LEFT_PORT (terminal)
+```
+- Invalid transitions (e.g. `LEFT_PORT -> AT_SEA` or skipping states) raise `InvalidStateTransitionError`.
+
+### 3. Deterministic Seed & Randomness
+- Centralized in `SimulationRandom(seed=42)`.
+- Resetting with the same seed and advancing the same hours produces strictly reproducible states, events, and KPIs.
+
+### 4. Operational KPI & Congestion Calculations
+- **Handling Duration**: `workload / (sum(crane_rates) * diminishing_returns_factor)` (minimum 1.0 h).
+- **Waiting Time**: Accrued hours while in `WAITING` status derived from simulation clock.
+- **Congestion Score**: Normalized composite formula `[0.0, 1.0]`:
+  `score = 0.35 * queue_factor + 0.25 * berth_util + 0.20 * yard_util + 0.20 * crane_util`
+  - Score labels: `< 0.30` -> `low`, `< 0.60` -> `medium`, `< 0.85` -> `high`, `>= 0.85` -> `critical`.
+- **PortState Snapshots**: Generated after every simulation step and stored in PostgreSQL.
+
+### 5. Simulation REST APIs
+- `POST /api/simulation/start`: Starts simulation clock progression.
+- `POST /api/simulation/pause`: Pauses simulation clock progression.
+- `POST /api/simulation/reset`: Resets state, clock, berths, cranes, yard, events, and snapshots.
+- `POST /api/simulation/advance`: Advances simulation clock by `hours` (default 1.0 h).
+- `GET /api/simulation/state`: Returns complete simulation state (vessels, coordinates, berths, cranes, yard, KPIs).
+- `GET /api/simulation/events`: Returns immutable event history.
+- `GET /api/simulation/kpis`: Returns real-time operational KPIs and congestion score.
+
+### 6. Known Limitations
+- The simulation is synthetic and does not represent live AIS/radar data.
+- Berth and crane allocations in Phase 2 use rule-based feasibility logic; mathematical optimization (OR-Tools) will be integrated in Phase 5.
+- Congestion score is an operational heuristic; machine learning predictive forecasting will be added in Phase 4.
+
