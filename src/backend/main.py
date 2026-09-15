@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api import health, vessels, berths, cranes, yard, routes, port
+from api import berths, cranes, health, port, prediction, routes, simulation, vessels, yard
 from config import get_settings
 from database.connection import engine
 from seed.seed_data import seed_if_empty
@@ -24,11 +24,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("HarborAI backend starting (env=%s)", settings.environment)
     if settings.seed_db:
-        await seed_if_empty()
+        try:
+            await seed_if_empty()
+        except Exception as exc:
+            logger.warning(
+                "Could not initialize seed data on startup (PostgreSQL may be offline or unmigrated): %s",
+                exc,
+            )
     yield
     # Shutdown
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except Exception as exc:
+        logger.warning("Error disposing database engine on shutdown: %s", exc)
     logger.info("HarborAI backend stopped")
+
 
 
 app = FastAPI(
@@ -44,11 +54,24 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc: Exception) -> JSONResponse:
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    code = "NOT_FOUND" if exc.status_code == 404 else f"HTTP_{exc.status_code}"
     return JSONResponse(
-        status_code=404,
-        content={"detail": "Resource not found", "code": "NOT_FOUND"},
+        status_code=exc.status_code,
+        content={"detail": str(exc.detail), "code": code},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid request parameters or payload", "code": "VALIDATION_ERROR"},
     )
 
 
@@ -72,3 +95,5 @@ app.include_router(cranes.router, prefix="/api")
 app.include_router(yard.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(port.router, prefix="/api")
+app.include_router(simulation.router)
+app.include_router(prediction.router)

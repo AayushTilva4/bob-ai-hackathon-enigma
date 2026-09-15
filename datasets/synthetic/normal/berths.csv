@@ -1,0 +1,7 @@
+berth_id,berth_code,name,max_vessel_length_m,max_draft_m,capacity,status,synthetic
+00000000-0000-0000-0000-000000000064,B-01,Berth Alpha,320.0,14.5,1,available,True
+00000000-0000-0000-0000-000000000065,B-02,Berth Bravo,280.0,13.0,1,available,True
+00000000-0000-0000-0000-000000000066,B-03,Berth Charlie,240.0,12.0,1,available,True
+00000000-0000-0000-0000-000000000067,B-04,Berth Delta,360.0,16.0,1,available,True
+00000000-0000-0000-0000-000000000068,B-05,Berth Echo,210.0,10.5,1,available,True
+00000000-0000-0000-0000-000000000069,B-06,Berth Foxtrot,300.0,14.0,1,available,True

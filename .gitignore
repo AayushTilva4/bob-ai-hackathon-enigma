@@ -1,6 +1,10 @@
-# Environment
+# Environment & secrets
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
 
 # Python
 __pycache__/
@@ -16,6 +20,11 @@ dist/
 build/
 *.egg
 
+# Databases & local stores
+*.db
+*.sqlite
+*.sqlite3
+
 # Testing / coverage
 .pytest_cache/
 .coverage
@@ -28,16 +37,26 @@ migrations/__pycache__/
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Node (frontend - Phase 8)
+# Node / Frontend
 node_modules/
 .next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
 
-# ML artifacts (Phase 4)
-src/backend/prediction/artifacts/*.pkl
-src/backend/prediction/artifacts/*.joblib
-src/backend/prediction/artifacts/*.json
+yarn-debug.log*
+yarn-error.log*
+
+# ML artifacts (Phase 4) — exclude large binaries, keep metrics
+models/*.joblib
+models/*.json
+# Uncomment below to track training_metrics.json in git:
+# !models/training_metrics.json
 
 # OS
 .DS_Store
 Thumbs.db
+

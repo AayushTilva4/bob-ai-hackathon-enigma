@@ -1,0 +1,2 @@
+port_id,port_name,country_region,timezone,number_of_berths,number_of_cranes,number_of_yard_zones,synthetic
+00000000-0000-0000-0000-000000000001,HarborAI Synthetic Digital Port,Singapore Straits Simulation Sector,UTC,6,10,6,True

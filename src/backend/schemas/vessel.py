@@ -11,8 +11,10 @@ class VesselRead(BaseModel):
 
     id: uuid.UUID
     name: str
+    imo_number: str | None = None
     vessel_type: VesselType
     length_m: float
+    beam_m: float | None = None
     draft_m: float
     container_capacity: int | None
     containers_to_handle: int | None

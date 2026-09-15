@@ -9,8 +9,8 @@ async def test_yard_api_returns_seeded_zones(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 4
-    assert len(body["data"]) == 4
+    assert body["total"] == 6
+    assert len(body["data"]) == 6
 
 
 @pytest.mark.asyncio

@@ -69,26 +69,29 @@ def upgrade() -> None:
         sa.Column("capacity", sa.Integer, nullable=False, server_default="1"),
         sa.Column("available_from", sa.DateTime(timezone=True), nullable=True),
         sa.Column("occupied_until", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("status", sa.Enum("available", "occupied", "maintenance", name="berthstatus"), nullable=False, server_default="available"),
+        sa.Column("status", berthstatus, nullable=False, server_default="available"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.UniqueConstraint("name", name="uq_berths_name"),
     )
+    op.create_index("ix_berths_status", "berths", ["status"])
 
     op.create_table(
         "vessels",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.VARCHAR(120), nullable=False),
-        sa.Column("vessel_type", sa.Enum("container", "bulk", "tanker", "ro_ro", "general", name="vesseltype"), nullable=False),
+        sa.Column("imo_number", sa.VARCHAR(20), nullable=True, unique=True),
+        sa.Column("vessel_type", vesseltype, nullable=False),
         sa.Column("length_m", sa.FLOAT, nullable=False),
+        sa.Column("beam_m", sa.FLOAT, nullable=True),
         sa.Column("draft_m", sa.FLOAT, nullable=False),
         sa.Column("container_capacity", sa.Integer, nullable=True),
         sa.Column("containers_to_handle", sa.Integer, nullable=True),
-        sa.Column("priority", sa.Enum("low", "normal", "high", "critical", name="vesselpriority"), nullable=False, server_default="normal"),
+        sa.Column("priority", vesselpriority, nullable=False, server_default="normal"),
         sa.Column("scheduled_eta", sa.DateTime(timezone=True), nullable=True),
         sa.Column("predicted_eta", sa.DateTime(timezone=True), nullable=True),
         sa.Column("actual_eta", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("status", sa.Enum("at_sea", "approaching", "waiting", "berth_assigned", "entering_berth", "at_berth", "crane_operations", "departing", "left_port", name="vesselstatus"), nullable=False, server_default="at_sea"),
+        sa.Column("status", vesselstatus, nullable=False, server_default="at_sea"),
         sa.Column("destination", sa.VARCHAR(120), nullable=True),
         sa.Column("assigned_berth_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("berths.id"), nullable=True),
         sa.Column("expected_handling_duration_h", sa.FLOAT, nullable=True),
@@ -96,12 +99,15 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
+    op.create_index("ix_vessels_status", "vessels", ["status"])
+    op.create_index("ix_vessels_assigned_berth_id", "vessels", ["assigned_berth_id"])
+    op.create_index("ix_vessels_imo_number", "vessels", ["imo_number"])
 
     op.create_table(
         "cranes",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("name", sa.VARCHAR(60), nullable=False),
-        sa.Column("status", sa.Enum("available", "operating", "maintenance", name="cranestatus"), nullable=False, server_default="available"),
+        sa.Column("status", cranestatus, nullable=False, server_default="available"),
         sa.Column("available_from", sa.DateTime(timezone=True), nullable=True),
         sa.Column("handling_rate_containers_per_h", sa.FLOAT, nullable=False),
         sa.Column("current_berth_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("berths.id"), nullable=True),
@@ -109,6 +115,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.UniqueConstraint("name", name="uq_cranes_name"),
     )
+    op.create_index("ix_cranes_status", "cranes", ["status"])
+    op.create_index("ix_cranes_current_berth_id", "cranes", ["current_berth_id"])
 
     op.create_table(
         "yard_zones",
@@ -146,10 +154,14 @@ def upgrade() -> None:
         sa.Column("yard_zone_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("yard_zones.id"), nullable=True),
         sa.Column("route_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("routes.id"), nullable=True),
         sa.Column("waiting_time_h", sa.FLOAT, nullable=False, server_default="0.0"),
-        sa.Column("status", sa.Enum("draft", "active", "completed", "cancelled", name="schedulestatus"), nullable=False, server_default="draft"),
+        sa.Column("status", schedulestatus, nullable=False, server_default="draft"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
+    op.create_index("ix_schedules_vessel_id", "schedules", ["vessel_id"])
+    op.create_index("ix_schedules_berth_id", "schedules", ["berth_id"])
+    op.create_index("ix_schedules_planned_start", "schedules", ["planned_start"])
+    op.create_index("ix_schedules_status", "schedules", ["status"])
 
     op.create_table(
         "simulation_events",
@@ -163,6 +175,9 @@ def upgrade() -> None:
         sa.Column("metadata", postgresql.JSON, nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
+    op.create_index("ix_simulation_events_simulation_time", "simulation_events", ["simulation_time"])
+    op.create_index("ix_simulation_events_event_type", "simulation_events", ["event_type"])
+    op.create_index("ix_simulation_events_vessel_id", "simulation_events", ["vessel_id"])
 
     op.create_table(
         "port_states",
@@ -174,10 +189,11 @@ def upgrade() -> None:
         sa.Column("waiting_vessel_count", sa.Integer, nullable=False, server_default="0"),
         sa.Column("active_vessel_count", sa.Integer, nullable=False, server_default="0"),
         sa.Column("upcoming_arrivals_24h", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("congestion_risk", sa.Enum("low", "medium", "high", "critical", name="congestionrisk"), nullable=False, server_default="low"),
+        sa.Column("congestion_risk", congestionrisk, nullable=False, server_default="low"),
         sa.Column("snapshot_metadata", postgresql.JSON, nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
     )
+    op.create_index("ix_port_states_simulation_time", "port_states", ["simulation_time"])
 
 
 def downgrade() -> None:
