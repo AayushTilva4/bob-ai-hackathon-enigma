@@ -20,7 +20,6 @@ import logging
 from pathlib import Path
 from typing import NamedTuple
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -152,13 +151,11 @@ def chronological_split(df: pd.DataFrame) -> DataSplit:
     partition while keeping the evaluation reproducible.
     """
     y = df[TARGET_COLUMN]
-    test_size = 1.0 - TRAIN_RATIO                         # 0.30
-    val_relative = VAL_RATIO / (VAL_RATIO + (1.0 - TRAIN_RATIO - VAL_RATIO))  # 0.50 of 0.30
 
-    # First cut: train vs (val+test)
+    # First cut: train (70%) vs temp (30% = val + test)
     X_train_df, X_temp_df, y_train, y_temp = train_test_split(
         df, y,
-        test_size=test_size,
+        test_size=round(1.0 - TRAIN_RATIO, 10),  # 0.30
         stratify=y,
         random_state=RANDOM_STATE,
     )
