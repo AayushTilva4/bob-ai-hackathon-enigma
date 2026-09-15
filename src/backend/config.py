@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_db: bool = True
     random_seed: int = 42
+    backend_host: str = "0.0.0.0"
+    backend_port: int = 8000
     version: str = "0.1.0"
 
 

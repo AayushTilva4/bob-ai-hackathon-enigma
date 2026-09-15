@@ -24,11 +24,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     logger.info("HarborAI backend starting (env=%s)", settings.environment)
     if settings.seed_db:
-        await seed_if_empty()
+        try:
+            await seed_if_empty()
+        except Exception as exc:
+            logger.warning(
+                "Could not initialize seed data on startup (PostgreSQL may be offline or unmigrated): %s",
+                exc,
+            )
     yield
     # Shutdown
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except Exception as exc:
+        logger.warning("Error disposing database engine on shutdown: %s", exc)
     logger.info("HarborAI backend stopped")
+
 
 
 app = FastAPI(
