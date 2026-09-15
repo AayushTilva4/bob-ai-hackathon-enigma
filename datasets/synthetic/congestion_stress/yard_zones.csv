@@ -1,0 +1,7 @@
+yard_zone_id,zone_code,name,total_capacity,occupied_capacity,status,synthetic
+00000000-0000-0000-0000-00000000012c,YZ-A,Yard Block A (Dry),2000,450,active,True
+00000000-0000-0000-0000-00000000012d,YZ-B,Yard Block B (Dry),2000,600,active,True
+00000000-0000-0000-0000-00000000012e,YZ-C,Yard Block C (Dry),1800,300,active,True
+00000000-0000-0000-0000-00000000012f,YZ-D,Yard Block D (Reefer),1200,250,active,True
+00000000-0000-0000-0000-000000000130,YZ-E,Yard Block E (Overflow),2500,400,active,True
+00000000-0000-0000-0000-000000000131,YZ-F,Yard Block F (Railhead),1500,200,active,True
